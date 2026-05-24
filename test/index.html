@@ -346,8 +346,8 @@
                 }
                 
                 audioList.push({
-                    name: song.name,
-                    artist: song.artist,
+                    name: song.title,
+                    artist: song.author,
                     url: song.url,
                     cover: song.pic || '',
                     lrc: lrcContent
@@ -385,8 +385,8 @@
             playlistEl.innerHTML = songs.map((song, index) => `
                 <div class="song-item" onclick="playSong(${index})">
                     <img src="${song.pic}" alt="" class="song-cover">
-                    <div class="song-name">${escapeHtml(song.name)}</div>
-                    <div class="song-artist">${escapeHtml(song.artist)}</div>
+                    <div class="song-name">${escapeHtml(song.title)}</div>
+                    <div class="song-artist">${escapeHtml(song.author)}</div>
                     <div class="song-url">${escapeHtml(song.url)}</div>
                     ${song.lrc ? '<div style="color: #00b7ff; font-size: 0.85em;">有歌词</div>' : ''}
                 </div>

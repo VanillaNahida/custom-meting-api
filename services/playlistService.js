@@ -87,7 +87,17 @@ class PlaylistService {
     return '';
   }
 
-  async parseAudioFile(filePath, baseDir) {
+  async parseAudioFile(filePath, baseDir, refreshMetadata = false) {
+    const stats = {
+      titleFromMetadata: false,
+      artistFromMetadata: false,
+      coverFromMetadata: false,
+      coverFromFile: false,
+      lrcAvailable: false,
+      ffmpegCoverExtracted: false,
+      ffmpegMetadataExtracted: false
+    };
+
     try {
       const metadata = await mm.parseFile(filePath);
       const { common, format } = metadata;
@@ -100,14 +110,20 @@ class PlaylistService {
         const coverName = `${path.basename(filePath, path.extname(filePath))}_cover${ext}`;
         const coverPath = path.join(baseDir, coverName);
 
-        if (!require('fs').existsSync(coverPath)) {
+        // 如果是刷新模式或者封面文件不存在，则写入
+        if (refreshMetadata || !require('fs').existsSync(coverPath)) {
           require('fs').writeFileSync(coverPath, picture.data);
+          stats.ffmpegCoverExtracted = true;
         }
 
         const relativePath = path.relative(config.playlist.baseDir, coverPath);
         cover = this.buildUrl(relativePath);
+        stats.coverFromMetadata = true;
       } else {
         cover = await this.getCoverFile(filePath, baseDir);
+        if (cover) {
+          stats.coverFromFile = true;
+        }
       }
 
       if (!cover) {
@@ -115,16 +131,27 @@ class PlaylistService {
       }
 
       const lrc = await this.getLrcFile(filePath);
+      stats.lrcAvailable = !!lrc;
 
       const relativePath = path.relative(config.playlist.baseDir, filePath);
       const url = this.buildUrl(relativePath);
 
+      const title = common.title || path.basename(filePath, path.extname(filePath));
+      const artist = common.artist || '未知艺术家';
+
+      stats.titleFromMetadata = !!common.title;
+      stats.artistFromMetadata = !!common.artist;
+      stats.ffmpegMetadataExtracted = true;
+
       return {
-        name: common.title || path.basename(filePath, path.extname(filePath)),
-        artist: common.artist || '未知艺术家',
-        url: url,
-        pic: cover,
-        lrc: lrc
+        track: {
+          title: title,
+          author: artist,
+          url: url,
+          pic: cover,
+          lrc: lrc
+        },
+        stats: stats
       };
     } catch (error) {
       console.error(`解析文件失败 ${filePath}:`, error.message);
@@ -132,20 +159,23 @@ class PlaylistService {
       const url = this.buildUrl(relativePath);
 
       return {
-        name: path.basename(filePath, path.extname(filePath)),
-        artist: '未知艺术家',
-        url: url,
-        pic: this.getDefaultCoverUrl(),
-        lrc: ''
+        track: {
+          title: path.basename(filePath, path.extname(filePath)),
+          author: '未知艺术家',
+          url: url,
+          pic: this.getDefaultCoverUrl(),
+          lrc: ''
+        },
+        stats: stats
       };
     }
   }
 
-  async scanPlaylist() {
+  async scanPlaylist(refreshMetadata = false) {
     const period = this.getCurrentPeriod();
     const cacheKey = period;
 
-    if (config.cache.enabled && this.cache.has(cacheKey)) {
+    if (!refreshMetadata && config.cache.enabled && this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey);
       const cacheAge = (Date.now() - cached.timestamp) / 1000;
 
@@ -170,14 +200,24 @@ class PlaylistService {
     });
 
     const playlist = [];
+    const allStats = [];
 
     for (const file of audioFiles) {
       const filePath = path.join(folderPath, file);
-      const track = await this.parseAudioFile(filePath, folderPath);
-      playlist.push(track);
+      const result = await this.parseAudioFile(filePath, folderPath, refreshMetadata);
+      playlist.push(result.track);
+      allStats.push({
+        file: file,
+        ...result.stats
+      });
     }
 
-    playlist.sort((a, b) => a.name.localeCompare(b.name));
+    playlist.sort((a, b) => a.title.localeCompare(b.title));
+
+    // 如果是刷新模式，输出详细的元数据统计
+    if (refreshMetadata) {
+      this.logMetadataStats(allStats);
+    }
 
     if (config.cache.enabled) {
       this.cache.set(cacheKey, {
@@ -189,6 +229,51 @@ class PlaylistService {
     this.lastScanTime.set(period, new Date());
 
     return playlist;
+  }
+
+  logMetadataStats(stats) {
+    const total = stats.length;
+    let titleFromMetadata = 0;
+    let artistFromMetadata = 0;
+    let coverFromMetadata = 0;
+    let coverFromFile = 0;
+    let lrcAvailable = 0;
+    let ffmpegCoverExtracted = 0;
+    let ffmpegMetadataExtracted = 0;
+
+    console.log('\n========== 歌单刷新元数据统计 ==========');
+    console.log('详细歌曲信息：');
+    
+    stats.forEach((stat, index) => {
+      if (stat.titleFromMetadata) titleFromMetadata++;
+      if (stat.artistFromMetadata) artistFromMetadata++;
+      if (stat.coverFromMetadata) coverFromMetadata++;
+      if (stat.coverFromFile) coverFromFile++;
+      if (stat.lrcAvailable) lrcAvailable++;
+      if (stat.ffmpegCoverExtracted) ffmpegCoverExtracted++;
+      if (stat.ffmpegMetadataExtracted) ffmpegMetadataExtracted++;
+
+      const details = [];
+      if (stat.titleFromMetadata) details.push('标题来自元数据');
+      if (stat.artistFromMetadata) details.push('艺术家来自元数据');
+      if (stat.coverFromMetadata) details.push('封面来自元数据');
+      if (stat.coverFromFile) details.push('封面来自文件');
+      if (stat.lrcAvailable) details.push('有歌词文件');
+      if (stat.ffmpegCoverExtracted) details.push('提取了新封面');
+      
+      console.log(`${index + 1}. ${stat.file} - ${details.length > 0 ? details.join(', ') : '使用默认值'}`);
+    });
+
+    console.log('\n汇总统计：');
+    console.log(`总计歌曲: ${total}`);
+    console.log(`标题来自元数据: ${titleFromMetadata} (${((titleFromMetadata / total) * 100).toFixed(1)}%)`);
+    console.log(`艺术家来自元数据: ${artistFromMetadata} (${((artistFromMetadata / total) * 100).toFixed(1)}%)`);
+    console.log(`封面来自元数据: ${coverFromMetadata} (${((coverFromMetadata / total) * 100).toFixed(1)}%)`);
+    console.log(`封面来自文件: ${coverFromFile} (${((coverFromFile / total) * 100).toFixed(1)}%)`);
+    console.log(`有歌词文件: ${lrcAvailable} (${((lrcAvailable / total) * 100).toFixed(1)}%)`);
+    console.log(`FFmpeg 提取封面: ${ffmpegCoverExtracted}`);
+    console.log(`FFmpeg 提取元数据: ${ffmpegMetadataExtracted}`);
+    console.log('==========================================\n');
   }
 
   clearCache() {

@@ -122,7 +122,7 @@ const requestLogger = (req, res, next) => {
 
 app.use(requestLogger);
 
-// 提供测试网页访问（如果启用）
+// 提供测试网页访问
 if (config.testPage.enabled) {
   app.use('/test', express.static(path.join(__dirname, 'test')));
 }
@@ -191,7 +191,7 @@ app.get('/api/status', (req, res) => {
 app.post('/api/refresh', async (req, res) => {
   try {
     playlistService.clearCache();
-    const playlist = await playlistService.scanPlaylist();
+    const playlist = await playlistService.scanPlaylist(true);
     
     res.set({
       'X-Period': playlistService.getCurrentPeriod(),
