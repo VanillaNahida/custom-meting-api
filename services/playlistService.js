@@ -11,6 +11,7 @@ class PlaylistService {
   constructor() {
     this.cache = new Map();
     this.lastScanTime = new Map();
+    this.mmAvailable = true;
   }
 
   // 构建完整的 URL
@@ -115,8 +116,7 @@ class PlaylistService {
       execFile(config.ffmpeg.ffmpegPath, [
         '-y',
         '-i', filePath,
-        '-an',
-        '-vcodec', 'copy',
+        '-map', '0:v',
         '-vframes', '1',
         outputPath
       ], { maxBuffer: 1024 * 1024, timeout: 15000 }, (err) => {
@@ -147,6 +147,7 @@ class PlaylistService {
     stats.ffmpegMetadataExtracted = true;
 
     let cover = '';
+    let coverSource = 'none';
     const baseName = path.basename(filePath, path.extname(filePath));
     const coverExts = ['.jpg', '.jpeg', '.png'];
 
@@ -155,36 +156,44 @@ class PlaylistService {
       try {
         await fs.access(existingCoverPath);
         cover = existingCoverPath;
+        coverSource = 'file';
         break;
       } catch {}
     }
 
-    for (const ext of coverExts) {
-      const coverName = `${baseName}_cover${ext}`;
-      const coverPath = path.join(baseDir, coverName);
-      try {
-        await fs.access(coverPath);
-        cover = coverPath;
-        break;
-      } catch {}
+    if (!cover) {
+      for (const ext of coverExts) {
+        const coverName = `${baseName}_cover${ext}`;
+        const coverPath = path.join(baseDir, coverName);
+        try {
+          await fs.access(coverPath);
+          cover = coverPath;
+          coverSource = 'ffmpeg';
+          break;
+        } catch {}
+      }
     }
 
     if (!cover) {
       try {
         const coverName = `${baseName}_cover.jpg`;
         const tmpCoverPath = path.join(baseDir, coverName);
-        if (refreshMetadata || !fsSync.existsSync(tmpCoverPath)) {
-          await this.extractCoverWithFfmpeg(filePath, tmpCoverPath);
-          stats.ffmpegCoverExtracted = true;
-        }
+        await this.extractCoverWithFfmpeg(filePath, tmpCoverPath);
+        stats.ffmpegCoverExtracted = true;
         cover = tmpCoverPath;
+        coverSource = 'ffmpeg';
       } catch {}
     }
 
     if (cover) {
       const relativePath = path.relative(config.playlist.baseDir, cover);
       cover = this.buildUrl(relativePath);
-      stats.coverFromMetadata = stats.ffmpegCoverExtracted;
+    }
+
+    if (coverSource === 'ffmpeg') {
+      stats.coverFromMetadata = true;
+    } else if (coverSource === 'file') {
+      stats.coverFromFile = true;
     }
 
     if (!cover) {
@@ -218,6 +227,64 @@ class PlaylistService {
     };
   }
 
+  async parseWithMusicMetadata(filePath, baseDir, refreshMetadata, stats) {
+    const metadata = await mm.parseFile(filePath);
+    const { common } = metadata;
+
+    let cover = '';
+
+    if (common.picture && common.picture.length > 0) {
+      const picture = common.picture[0];
+      const ext = picture.format.includes('jpeg') || picture.format.includes('jpg') ? '.jpg' : '.png';
+      const coverName = `${path.basename(filePath, path.extname(filePath))}_cover${ext}`;
+      const coverPath = path.join(baseDir, coverName);
+
+      if (refreshMetadata || !fsSync.existsSync(coverPath)) {
+        fsSync.writeFileSync(coverPath, picture.data);
+      }
+
+      const relativePath = path.relative(config.playlist.baseDir, coverPath);
+      cover = this.buildUrl(relativePath);
+      stats.coverFromMetadata = true;
+    } else {
+      cover = await this.getCoverFile(filePath, baseDir);
+      if (cover) {
+        stats.coverFromFile = true;
+      }
+    }
+
+    if (!cover) {
+      cover = this.getDefaultCoverUrl();
+    }
+
+    const lrc = await this.getLrcFile(filePath);
+    stats.lrcAvailable = !!lrc;
+
+    const relativePath = path.relative(config.playlist.baseDir, filePath);
+    const url = this.buildUrl(relativePath);
+
+    const title = common.title || path.basename(filePath, path.extname(filePath));
+    const artist = common.artist || '未知艺术家';
+
+    const id = crypto.createHash('md5').update(filePath).digest('hex');
+
+    stats.titleFromMetadata = !!common.title;
+    stats.artistFromMetadata = !!common.artist;
+    stats.ffmpegMetadataExtracted = true;
+
+    return {
+      track: {
+        id: id,
+        title: title,
+        author: artist,
+        url: url,
+        pic: cover,
+        lrc: lrc
+      },
+      stats: stats
+    };
+  }
+
   async parseAudioFile(filePath, baseDir, refreshMetadata = false) {
     const stats = {
       titleFromMetadata: false,
@@ -230,71 +297,18 @@ class PlaylistService {
     };
 
     try {
-      const metadata = await mm.parseFile(filePath);
-      const { common, format } = metadata;
-
-      let cover = '';
-
-      if (common.picture && common.picture.length > 0) {
-        const picture = common.picture[0];
-        const ext = picture.format.includes('jpeg') || picture.format.includes('jpg') ? '.jpg' : '.png';
-        const coverName = `${path.basename(filePath, path.extname(filePath))}_cover${ext}`;
-        const coverPath = path.join(baseDir, coverName);
-
-        // 如果是刷新模式或者封面文件不存在，则写入
-        if (refreshMetadata || !fsSync.existsSync(coverPath)) {
-          fsSync.writeFileSync(coverPath, picture.data);
-          stats.ffmpegCoverExtracted = true;
-        }
-
-        const relativePath = path.relative(config.playlist.baseDir, coverPath);
-        cover = this.buildUrl(relativePath);
-        stats.coverFromMetadata = true;
-      } else {
-        cover = await this.getCoverFile(filePath, baseDir);
-        if (cover) {
-          stats.coverFromFile = true;
+      if (this.mmAvailable) {
+        try {
+          return await this.parseWithMusicMetadata(filePath, baseDir, refreshMetadata, stats);
+        } catch (mmError) {
+          console.warn(`music-metadata 已禁用，后续文件将直接使用 ffprobe（原因: ${mmError.message}）`);
+          this.mmAvailable = false;
         }
       }
 
-      if (!cover) {
-        cover = this.getDefaultCoverUrl();
-      }
-
-      const lrc = await this.getLrcFile(filePath);
-      stats.lrcAvailable = !!lrc;
-
-      const relativePath = path.relative(config.playlist.baseDir, filePath);
-      const url = this.buildUrl(relativePath);
-
-      const title = common.title || path.basename(filePath, path.extname(filePath));
-      const artist = common.artist || '未知艺术家';
-
-      const id = crypto.createHash('md5').update(filePath).digest('hex');
-
-      stats.titleFromMetadata = !!common.title;
-      stats.artistFromMetadata = !!common.artist;
-      stats.ffmpegMetadataExtracted = true;
-
-      return {
-        track: {
-          id: id,
-          title: title,
-          author: artist,
-          url: url,
-          pic: cover,
-          lrc: lrc
-        },
-        stats: stats
-      };
-    } catch (error) {
-      console.warn(`music-metadata 解析失败，尝试 ffprobe: ${filePath}`);
-      try {
-        const result = await this.parseWithFfprobe(filePath, baseDir, refreshMetadata, stats);
-        return result;
-      } catch (ffprobeError) {
-        console.error(`ffprobe 解析也失败: ${filePath}`, ffprobeError.message);
-      }
+      return await this.parseWithFfprobe(filePath, baseDir, refreshMetadata, stats);
+    } catch (ffprobeError) {
+      console.error(`ffprobe 解析也失败: ${filePath}`, ffprobeError.message);
       const relativePath = path.relative(config.playlist.baseDir, filePath);
       const url = this.buildUrl(relativePath);
       const id = crypto.createHash('md5').update(filePath).digest('hex');
