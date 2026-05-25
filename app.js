@@ -354,16 +354,29 @@ function startServer() {
 }
 
 // 优雅关闭函数
+let isShuttingDown = false;
+
 function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
   logger.warning(`\n${colors.fg.yellow}${signal}${colors.reset} 收到关闭信号，正在停止服务...`);
   
   if (server) {
+    server.closeAllConnections();
+    server.closeIdleConnections();
+
+    const forceExit = setTimeout(() => {
+      logger.error('无法正常关闭，强制退出');
+      process.exit(1);
+    }, 3000);
+
     server.close((err) => {
+      clearTimeout(forceExit);
       if (err) {
         logger.error(`关闭服务器时出错: ${err.message}`);
         process.exit(1);
       }
-      
       logger.success('HTTP 服务器已正常关闭');
       process.exit(0);
     });
@@ -371,17 +384,10 @@ function gracefulShutdown(signal) {
     logger.info('服务器未启动，直接退出');
     process.exit(0);
   }
-
-  // 如果10秒后还没关闭，强制退出
-  setTimeout(() => {
-    logger.error('无法正常关闭，强制退出');
-    process.exit(1);
-  }, 10000);
 }
 
-// 监听关闭信号
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // 处理未捕获的异常
 process.on('uncaughtException', (err) => {

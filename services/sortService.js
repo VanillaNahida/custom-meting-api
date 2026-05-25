@@ -45,8 +45,14 @@ function applyOrder(songs, orderIds) {
 async function getOrderedPlaylist(songs, period) {
   const order = await getOrder(period);
   if (!order || order.length === 0) {
+    if (order && order.length === 0) {
+      console.log(`[排序] ${period}: playlist-order.json 中该时段为空数组`);
+    } else {
+      console.log(`[排序] ${period}: playlist-order.json 中无该时段配置`);
+    }
     return songs;
   }
+  console.log(`[排序] ${period}: 从 playlist-order.json 读取了 ${order.length} 条排序记录`);
   return applyOrder(songs, order);
 }
 

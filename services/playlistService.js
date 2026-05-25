@@ -111,6 +111,19 @@ class PlaylistService {
     });
   }
 
+  resolveArtist(rawArtist, fallback) {
+    if (!rawArtist) return fallback;
+
+    const separators = ['、', '/', ';', ' feat. ', ' ft. ', ' & ', ' × ', ' x '];
+    for (const sep of separators) {
+      if (rawArtist.includes(sep)) {
+        return rawArtist.split(sep).map(a => a.trim()).filter(Boolean).join('、');
+      }
+    }
+
+    return rawArtist;
+  }
+
   extractCoverWithFfmpeg(filePath, outputPath) {
     return new Promise((resolve, reject) => {
       execFile(config.ffmpeg.ffmpegPath, [
@@ -140,7 +153,7 @@ class PlaylistService {
     const probeData = await this.execFfprobe(filePath);
     const formatTags = (probeData.format && probeData.format.tags) || {};
     const title = formatTags.title || path.basename(filePath, path.extname(filePath));
-    const artist = formatTags.artist || '未知艺术家';
+    const artist = this.resolveArtist(formatTags.artist, '未知艺术家');
 
     stats.titleFromMetadata = !!formatTags.title;
     stats.artistFromMetadata = !!formatTags.artist;
@@ -212,7 +225,8 @@ class PlaylistService {
 
     const relativePath = path.relative(config.playlist.baseDir, filePath);
     const url = this.buildUrl(relativePath);
-    const id = crypto.createHash('md5').update(filePath).digest('hex');
+    const stablePath = relativePath.replace(/\\/g, '/');
+    const id = crypto.createHash('md5').update(stablePath).digest('hex');
 
     return {
       track: {
@@ -264,12 +278,15 @@ class PlaylistService {
     const url = this.buildUrl(relativePath);
 
     const title = common.title || path.basename(filePath, path.extname(filePath));
-    const artist = common.artist || '未知艺术家';
+    const artist = (common.artists && common.artists.length > 1)
+      ? common.artists.join('、')
+      : (common.artist || '未知艺术家');
 
-    const id = crypto.createHash('md5').update(filePath).digest('hex');
+    const stablePath = relativePath.replace(/\\/g, '/');
+    const id = crypto.createHash('md5').update(stablePath).digest('hex');
 
     stats.titleFromMetadata = !!common.title;
-    stats.artistFromMetadata = !!common.artist;
+    stats.artistFromMetadata = !!(common.artists && common.artists.length > 0) || !!common.artist;
     stats.ffmpegMetadataExtracted = true;
 
     return {
@@ -311,7 +328,8 @@ class PlaylistService {
       console.error(`ffprobe 解析也失败: ${filePath}`, ffprobeError.message);
       const relativePath = path.relative(config.playlist.baseDir, filePath);
       const url = this.buildUrl(relativePath);
-      const id = crypto.createHash('md5').update(filePath).digest('hex');
+      const stablePath = relativePath.replace(/\\/g, '/');
+      const id = crypto.createHash('md5').update(stablePath).digest('hex');
 
       return {
         track: {
@@ -336,6 +354,7 @@ class PlaylistService {
       const cacheAge = (Date.now() - cached.timestamp) / 1000;
 
       if (cacheAge < config.cache.maxAge) {
+        console.log(`[缓存] ${period}: 命中缓存 (${Math.round(cacheAge)}s/${config.cache.maxAge}s)`);
         return cached.data;
       }
     }
@@ -370,6 +389,7 @@ class PlaylistService {
 
     playlist.sort((a, b) => a.title.localeCompare(b.title));
 
+    console.log(`[扫描] ${period}: 扫描到 ${playlist.length} 首歌曲，正在应用排序...`);
     const orderedPlaylist = await sortService.getOrderedPlaylist(playlist, period);
 
     // 如果是刷新模式，输出详细的元数据统计
@@ -436,6 +456,7 @@ class PlaylistService {
 
   clearCache() {
     this.cache.clear();
+    console.log('[缓存] 已清除所有缓存');
   }
 
   async scanAllPlaylists() {
@@ -476,6 +497,28 @@ class PlaylistService {
     }
 
     return allSongs;
+  }
+
+  async getSongIds(period) {
+    const folderName = period === 'daytime'
+      ? config.playlist.daytime.folder
+      : config.playlist.night.folder;
+    const folderPath = path.resolve(config.playlist.baseDir, folderName);
+
+    try {
+      const files = await fs.readdir(folderPath);
+      const ids = [];
+      for (const f of files) {
+        if (config.supportedFormats.includes(path.extname(f).toLowerCase())) {
+          const relPath = path.relative(config.playlist.baseDir, path.join(folderPath, f));
+          const stablePath = relPath.replace(/\\/g, '/');
+          ids.push(crypto.createHash('md5').update(stablePath).digest('hex'));
+        }
+      }
+      return ids;
+    } catch {
+      return [];
+    }
   }
 }
 

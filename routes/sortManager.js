@@ -59,7 +59,15 @@ router.post('/api/manage/order/:period', async (req, res) => {
       return res.status(400).json({ success: false, error: 'order 必须是数组' });
     }
 
-    await sortService.saveOrder(period, order);
+    const validIds = new Set(await playlistService.getSongIds(period));
+    const cleanedOrder = order.filter(id => validIds.has(id));
+    const removed = order.length - cleanedOrder.length;
+
+    if (removed > 0) {
+      console.log(`[排序] ${period}: 移除了 ${removed} 个不存在的歌曲ID`);
+    }
+
+    await sortService.saveOrder(period, cleanedOrder);
     playlistService.clearCache();
 
     res.json({ success: true, message: '排序已保存' });
