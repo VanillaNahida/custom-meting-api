@@ -267,7 +267,7 @@
                 <span class="status-value" id="currentPeriod">-</span>
             </div>
             <div class="status-item">
-                <span class="status-label">当前时间:</span>
+                <span class="status-label">当前时间（服务器时间）:</span>
                 <span class="status-value" id="currentTime">-</span>
             </div>
         </div>
@@ -294,8 +294,6 @@
         const API_BASE = '/api';
         let currentPlaylist = [];
         let aplayer = null;
-        let serverTimestamp = null;
-        let localTimestampAtServerTime = null;
         let timeUpdateInterval = null;
         
         // 获取歌单
@@ -327,13 +325,11 @@
         
         // 初始化 APlayer
         async function initAPlayer(songs) {
-            // 转换数据格式为 APlayer 所需格式
             const audioList = [];
             
             for (const song of songs) {
                 let lrcContent = '';
                 
-                // 如果有歌词文件路径，尝试加载歌词内容
                 if (song.lrc) {
                     try {
                         const response = await fetch(song.lrc);
@@ -354,12 +350,10 @@
                 });
             }
             
-            // 如果已存在播放器，销毁它
             if (aplayer) {
                 aplayer.destroy();
             }
             
-            // 创建新的 APlayer 实例
             aplayer = new APlayer({
                 container: document.getElementById('aplayer'),
                 theme: '#00b7ff',
@@ -367,10 +361,12 @@
                 order: 'list',
                 preload: 'metadata',
                 volume: 0.7,
-                lrcType: 1, // 启用歌词显示，1表示使用lrc格式字符串
+                lrcType: 1,
                 mutex: true,
+                listFolded: true,
                 audio: audioList
             });
+            
         }
         
         // 渲染歌单
@@ -399,7 +395,6 @@
                 aplayer.list.switch(index);
                 aplayer.play();
                 
-                // 显示歌词
                 const song = currentPlaylist[index];
                 if (song.lrc) {
                     try {
@@ -433,7 +428,6 @@
                 
                 document.getElementById('status').classList.remove('hidden');
                 document.getElementById('serviceStatus').textContent = data.status;
-                // 使用 updateStatus 来统一更新并启动时间定时器
                 updateStatus(data.period, null, data.currentTime);
             } catch (error) {
                 console.error('Error:', error);
@@ -448,70 +442,77 @@
             
             const clearBtn = document.getElementById('clearCacheBtn');
             const originalText = clearBtn.textContent;
-            clearBtn.innerHTML = '<span class="loading"></span>清除中...';
+            clearBtn.innerHTML = '<span class="loading"></span>清空中...';
             
             try {
                 const response = await fetch(`${API_BASE}/refresh`, { method: 'POST' });
-                const playlist = await response.json();
+                const data = await response.json();
                 
-                if (Array.isArray(playlist)) {
-                    alert('缓存已清除！');
-                    currentPlaylist = playlist;
-                    renderPlaylist(playlist);
-                    
-                    const period = response.headers.get('X-Period');
-                    const currentTime = response.headers.get('X-Current-Time');
-                    updateStatus(period, null, currentTime);
-                    
-                    await initAPlayer(playlist);
+                if (Array.isArray(data)) {
+                    alert('刷新成功，共 ' + data.length + ' 首歌曲');
+                    fetchPlaylist();
                 } else {
-                    alert('清除失败: 数据格式错误');
+                    alert('刷新失败: ' + (data.message || '未知错误'));
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('请求失败: ' + error.message);
+                alert('刷新失败: ' + error.message);
+            } finally {
+                clearBtn.textContent = originalText;
             }
-            
-            clearBtn.textContent = originalText;
         }
         
         // 更新状态显示
-        function updateStatus(period, folder, time) {
-            document.getElementById('status').classList.remove('hidden');
-            document.getElementById('currentPeriod').textContent = period;
+        function updateStatus(period, serverTime, currentTime) {
+            const serviceStatus = document.getElementById('serviceStatus');
+            const currentPeriod = document.getElementById('currentPeriod');
             
-            // 保存服务器时间和对应的本地时间作为基准
-            serverTimestamp = new Date(time).getTime();
-            localTimestampAtServerTime = Date.now();
-            
-            // 立即更新显示
-            updateCurrentTimeDisplay();
-            
-            // 启动定时器，每秒更新一次时间
-            if (timeUpdateInterval) {
-                clearInterval(timeUpdateInterval);
+            if (period) {
+                const periodMap = { daytime: '日间歌单', night: '夜间歌单' };
+                serviceStatus.textContent = '运行中';
+                serviceStatus.style.color = '#4CAF50';
+                currentPeriod.textContent = periodMap[period] || period;
             }
-            timeUpdateInterval = setInterval(updateCurrentTimeDisplay, 1000);
-        }
-        
-        // 更新当前时间显示
-        function updateCurrentTimeDisplay() {
-            if (serverTimestamp && localTimestampAtServerTime) {
-                // 根据服务器时间基准计算当前时间
-                const elapsed = Date.now() - localTimestampAtServerTime;
-                const currentServerTime = new Date(serverTimestamp + elapsed);
-                document.getElementById('currentTime').textContent = currentServerTime.toLocaleString();
+            
+            if (currentTime) {
+                startTimeUpdate(currentTime);
             }
         }
         
         // HTML转义
         function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
         
-        // 事件绑定
+        // 启动时间更新
+        function startTimeUpdate(serverTimeStr) {
+            if (!serverTimeStr) return;
+            
+            if (timeUpdateInterval) {
+                clearInterval(timeUpdateInterval);
+            }
+            
+            const serverDate = new Date(serverTimeStr);
+            const localNow = new Date();
+            const diff = serverDate.getTime() - localNow.getTime();
+            
+            function updateTime() {
+                const adjustedTime = new Date(new Date().getTime() + diff);
+                document.getElementById('currentTime').textContent = adjustedTime.toLocaleString('zh-CN');
+            }
+            
+            updateTime();
+            timeUpdateInterval = setInterval(updateTime, 1000);
+        }
+        
+        // 事件监听
         document.getElementById('refreshBtn').addEventListener('click', fetchPlaylist);
         document.getElementById('statusBtn').addEventListener('click', fetchStatus);
         document.getElementById('clearCacheBtn').addEventListener('click', clearCache);

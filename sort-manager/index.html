@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>歌曲排序管理</title>
+
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/VanillaNahida/BA-Spark-Cursor/fonts/Blueaka/Blueaka.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/VanillaNahida/BA-Spark-Cursor/fonts/Blueaka_Bold/Blueaka_Bold.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Blueaka", sans-serif;
+      font-weight: 400;
+    }
+
+    b, strong, h1, h2, h3, h4, h5, h6, .bold-text {
+      font-weight: 700;
+    }
+
+    body {
+      font-family: 'Blueaka', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: url('https://img.dkdun.cn/v1/2026/17/2e6fd9b414cb52d0.jpeg') center/cover no-repeat fixed;
+      color: #333;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .login-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .login-box {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      width: 400px;
+      max-width: 90vw;
+    }
+
+    .login-box h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      text-align: center;
+      text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .login-box p {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .login-box input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .login-box input:focus {
+      border-color: #00b7ff;
+    }
+
+    .login-box button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 16px;
+      background: linear-gradient(135deg, #00b7ff 0%, #00d4ff 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 2px 8px rgba(0, 183, 255, 0.3);
+    }
+
+    .login-box button:hover {
+      background: linear-gradient(135deg, #00a3e6 0%, #00c4ee 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 183, 255, 0.4);
+    }
+
+    .login-box .error {
+      color: #e74c3c;
+      font-size: 13px;
+      margin-top: 12px;
+      text-align: center;
+      display: none;
+    }
+
+    .manager-container {
+      max-width: 800px;
+      height: 100vh;
+      margin: 0 auto;
+      padding: 24px 16px 0 16px;
+      display: none;
+      flex-direction: column;
+    }
+
+    .manager-top {
+      flex-shrink: 0;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      color: #fff;
+      text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .header h1 {
+      font-size: 22px;
+    }
+
+    .header button {
+      padding: 8px 20px;
+      background: rgba(231, 76, 60, 0.25);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      border: 1px solid rgba(231, 76, 60, 0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .header button:hover {
+      background: rgba(231, 76, 60, 0.85);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(10px);
+      border-radius: 10px;
+      padding: 4px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 500;
+      transition: all 0.2s;
+      border: none;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .tab.active {
+      background: rgba(255, 255, 255, 0.85);
+      color: #333;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .toolbar .count {
+      font-size: 13px;
+      text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .toolbar button.refresh-btn {
+      padding: 8px 20px;
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-right: 8px;
+    }
+
+    .toolbar button.refresh-btn:hover {
+      background: rgba(255, 255, 255, 0.35);
+      transform: translateY(-2px);
+    }
+
+    .toolbar button.save-btn {
+      padding: 8px 24px;
+      background: linear-gradient(135deg, #00b7ff 0%, #00d4ff 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 2px 8px rgba(0, 183, 255, 0.3);
+    }
+
+    .toolbar button.save-btn:hover {
+      background: linear-gradient(135deg, #00a3e6 0%, #00c4ee 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 183, 255, 0.4);
+    }
+
+    .toolbar button.save-btn:disabled {
+      background: rgba(255, 255, 255, 0.3);
+      box-shadow: none;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .toolbar button.save-btn.saved {
+      background: rgba(255, 255, 255, 0.3);
+      box-shadow: none;
+    }
+
+    .song-list {
+      flex: 1;
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      margin-bottom: 84px;
+    }
+
+    .song-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: grab;
+      transition: background 0.15s;
+      user-select: none;
+    }
+
+    .song-item:last-child {
+      border-bottom: none;
+    }
+
+    .song-item:hover {
+      background: rgba(0, 183, 255, 0.08);
+    }
+
+    .song-item.dragging {
+      opacity: 0.4;
+      background: rgba(0, 183, 255, 0.12);
+    }
+
+    .song-item.drag-over {
+      background: rgba(0, 183, 255, 0.1);
+      border-top: 3px solid #00b7ff;
+    }
+
+    .song-item.selected {
+      background: rgba(0, 183, 255, 0.12);
+      outline: 2px solid rgba(0, 183, 255, 0.5);
+      outline-offset: -2px;
+    }
+
+    .drag-handle {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      margin-right: 12px;
+      color: #bbb;
+      flex-shrink: 0;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .drag-handle span {
+      display: block;
+      width: 16px;
+      height: 2px;
+      background: #ccc;
+      margin: 2px 0;
+      border-radius: 1px;
+    }
+
+    .song-index {
+      width: 28px;
+      height: 28px;
+      background: #f0f0f0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: #888;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+
+    .song-cover-wrap {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      margin-right: 12px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .song-cover {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #eee;
+    }
+
+    .cover-play-btn {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      border-radius: 6px;
+    }
+
+    .song-cover-wrap:hover .cover-play-btn {
+      opacity: 1;
+    }
+
+    .cover-play-btn.playing {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .cover-play-btn img {
+      width: 20px;
+      height: 20px;
+      filter: brightness(0) invert(1);
+      pointer-events: none;
+    }
+
+    .song-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .song-title {
+      font-size: 15px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .song-author {
+      font-size: 13px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .toast {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+
+    .toast.success {
+      background: linear-gradient(135deg, #27ae60, #2ecc71);
+    }
+
+    .toast.error {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #aaa;
+    }
+
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      opacity: 0.4;
+    }
+
+    #aplayer-container {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 600px;
+      z-index: 999;
+    }
+
+    .aplayer {
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .drag-ghost {
+      position: fixed;
+      left: 0;
+      top: 0;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      z-index: 9999;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="login-container" id="loginContainer">
+    <div class="login-box">
+      <h1>🎵 歌曲排序管理</h1>
+      <p>请输入访问密码以继续</p>
+      <input type="password" id="passwordInput" placeholder="输入访问密码..." autofocus>
+      <button onclick="doLogin()">登 录</button>
+      <div class="error" id="loginError">密码错误，请重试</div>
+    </div>
+  </div>
+
+  <div class="manager-container" id="managerContainer">
+    <div class="manager-top">
+      <div class="header">
+        <h1>🎵 歌曲排序管理</h1>
+        <button onclick="doLogout()">退出登录</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-period="daytime" onclick="switchTab('daytime')">☀️ 日间歌单</button>
+        <button class="tab" data-period="night" onclick="switchTab('night')">🌙 夜间歌单</button>
+      </div>
+
+      <div class="toolbar">
+        <span class="count" id="songCount">共 0 首歌曲</span>
+        <div>
+          <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">🔄 刷新</button>
+          <button class="save-btn" id="saveBtn" onclick="saveOrder()">💾 保存排序</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="song-list" id="songList"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div id="aplayer-container">
+    <div id="aplayer"></div>
+  </div>
+
+  <script>
+    let token = localStorage.getItem('sort_manager_token');
+    let currentPeriod = 'daytime';
+    let allSongs = {};
+    let currentOrder = [];
+    let hasChanges = false;
+    let aplayer = null;
+    let currentPlayingId = null;
+    let selectedIds = new Set();
+    let lastClickedIndex = -1;
+
+    function api(path, options = {}) {
+      return fetch(path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+          ...options.headers
+        }
+      }).then(r => r.json());
+    }
+
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast ' + type + ' show';
+      setTimeout(() => { t.className = 'toast ' + type; }, 2500);
+    }
+
+    function doLogin() {
+      const pw = document.getElementById('passwordInput').value.trim();
+      if (!pw) return;
+      token = pw;
+      loadData().then(success => {
+        if (success) {
+          localStorage.setItem('sort_manager_token', token);
+          document.getElementById('loginContainer').style.display = 'none';
+          document.getElementById('managerContainer').style.display = 'flex';
+        } else {
+          document.getElementById('loginError').style.display = 'block';
+          token = null;
+        }
+      });
+    }
+
+    document.getElementById('passwordInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    async function loadData() {
+      try {
+        const res = await api('/api/manage/songs');
+        if (!res.success) return false;
+        allSongs = res.data;
+        selectedIds.clear();
+        lastClickedIndex = -1;
+        renderCurrentTab();
+        initAPlayer();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    async function refreshData() {
+      const btn = document.getElementById('refreshBtn');
+      btn.textContent = '⏳ 刷新中...';
+      btn.disabled = true;
+
+      try {
+        const res = await api('/api/manage/songs');
+        if (res.success) {
+          allSongs = res.data;
+          selectedIds.clear();
+          lastClickedIndex = -1;
+          hasChanges = false;
+          updateSaveBtn();
+          renderCurrentTab();
+          initAPlayer();
+          showToast('已获取最新歌曲列表', 'success');
+        } else {
+          showToast('刷新失败: ' + (res.error || '未知错误'), 'error');
+        }
+      } catch {
+        showToast('网络错误，刷新失败', 'error');
+      } finally {
+        btn.textContent = '🔄 刷新';
+        btn.disabled = false;
+      }
+    }
+
+    function switchTab(period) {
+      currentPeriod = period;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`.tab[data-period="${period}"]`).classList.add('active');
+      hasChanges = false;
+      updateSaveBtn();
+      currentPlayingId = null;
+      selectedIds.clear();
+      lastClickedIndex = -1;
+      renderCurrentTab();
+      initAPlayer();
+    }
+
+    function renderCurrentTab() {
+      const songs = allSongs[currentPeriod] || [];
+      currentOrder = songs.map(s => s.id);
+      document.getElementById('songCount').textContent = `共 ${songs.length} 首歌曲`;
+
+      const list = document.getElementById('songList');
+      if (songs.length === 0) {
+        list.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 19V6l12-3v13"/><path d="M9 19c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2z"/><path d="M21 16c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2z"/></svg><p>该时段暂无歌曲</p></div>';
+        return;
+      }
+
+      list.innerHTML = songs.map((s, i) => `
+    <div class="song-item" draggable="true" data-id="${s.id}" data-index="${i}">
+      <div class="drag-handle"><span></span><span></span><span></span></div>
+      <div class="song-index">${i + 1}</div>
+      <div class="song-cover-wrap">
+        <img class="song-cover" src="${escapeAttr(s.pic)}" alt="" loading="lazy" onerror="this.style.display='none'">
+        <button class="cover-play-btn" data-song-id="${escapeAttr(s.id)}">
+          <img src="play.svg" class="play-icon" alt="播放">
+        </button>
+      </div>
+      <div class="song-info">
+        <div class="song-title">${escapeHtml(s.title)}</div>
+        <div class="song-author">${escapeHtml(s.author)}</div>
+      </div>
+    </div>
+  `).join('');
+
+      attachDragEvents();
+      applySelectionUI();
+    }
+
+    function initAPlayer() {
+      const all = [];
+      (allSongs[currentPeriod] || []).forEach(s => {
+        all.push({
+          name: s.title,
+          artist: s.author,
+          url: s.url,
+          cover: s.pic,
+          id: s.id
+        });
+      });
+
+      if (aplayer) {
+        aplayer.destroy();
+        aplayer = null;
+      }
+
+      if (all.length === 0) return;
+
+      aplayer = new APlayer({
+        container: document.getElementById('aplayer'),
+        theme: '#00b7ff',
+        loop: 'all',
+        order: 'list',
+        preload: 'metadata',
+        volume: 0.7,
+        lrcType: 0,
+        mutex: true,
+        listFolded: true,
+        audio: all
+      });
+
+      aplayer.on('play', () => {
+        const songs = allSongs[currentPeriod] || [];
+        const song = songs[aplayer.list.index] || songs[0];
+        if (song) {
+          currentPlayingId = song.id;
+          updatePlayButtons();
+        }
+      });
+
+      aplayer.on('pause', () => {
+        currentPlayingId = null;
+        updatePlayButtons();
+      });
+
+      aplayer.on('ended', () => {
+        currentPlayingId = null;
+        updatePlayButtons();
+      });
+    }
+
+    function togglePlay(songId) {
+      const songs = allSongs[currentPeriod] || [];
+      if (songs.length === 0) return;
+
+      if (!aplayer) initAPlayer();
+      if (!aplayer) return;
+
+      if (currentPlayingId === songId) {
+        aplayer.pause();
+        return;
+      }
+
+      const songsForAPlayer = songs.map(s => ({
+        name: s.title,
+        artist: s.author,
+        url: s.url,
+        cover: s.pic,
+        id: s.id
+      }));
+
+      const idx = songsForAPlayer.findIndex(s => s.id === songId);
+      if (idx === -1) return;
+
+      aplayer.list.clear();
+      songsForAPlayer.forEach(s => aplayer.list.add([s]));
+
+      aplayer.list.switch(idx);
+      aplayer.play();
+    }
+
+    function updatePlayButtons() {
+      document.querySelectorAll('.cover-play-btn').forEach(btn => {
+        const sid = btn.dataset.songId;
+        const icon = btn.querySelector('.play-icon');
+        if (sid === currentPlayingId) {
+          btn.classList.add('playing');
+          if (icon) icon.src = 'pause.svg';
+        } else {
+          btn.classList.remove('playing');
+          if (icon) icon.src = 'play.svg';
+        }
+      });
+    }
+
+    document.getElementById('songList').addEventListener('click', function(e) {
+      const btn = e.target.closest('.cover-play-btn');
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        togglePlay(btn.dataset.songId);
+        return;
+      }
+
+      const item = e.target.closest('.song-item');
+      if (!item) return;
+
+      const id = item.dataset.id;
+      const idx = parseInt(item.dataset.index);
+
+      if (e.ctrlKey || e.metaKey) {
+        if (selectedIds.has(id)) {
+          selectedIds.delete(id);
+        } else {
+          selectedIds.add(id);
+        }
+        lastClickedIndex = idx;
+      } else if (e.shiftKey && lastClickedIndex >= 0) {
+        const start = Math.min(lastClickedIndex, idx);
+        const end = Math.max(lastClickedIndex, idx);
+        const allItems = [...document.querySelectorAll('.song-item')];
+        if (!e.ctrlKey && !e.metaKey) selectedIds.clear();
+        for (let i = start; i <= end; i++) {
+          selectedIds.add(allItems[i].dataset.id);
+        }
+      } else {
+        if (!selectedIds.has(id) || selectedIds.size !== 1) {
+          selectedIds.clear();
+          selectedIds.add(id);
+        }
+        lastClickedIndex = idx;
+      }
+
+      applySelectionUI();
+    });
+
+    function applySelectionUI() {
+      document.querySelectorAll('.song-item').forEach(item => {
+        if (selectedIds.has(item.dataset.id)) {
+          item.classList.add('selected');
+        } else {
+          item.classList.remove('selected');
+        }
+      });
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function escapeAttr(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function attachDragEvents() {
+      const list = document.getElementById('songList');
+      const items = document.querySelectorAll('.song-item');
+      let draggedId = null;
+      let autoScrollSpeed = 0;
+      let autoScrollRAF = null;
+      const isMobile = 'ontouchstart' in window;
+
+      function updateAutoScroll(e) {
+        const rect = list.getBoundingClientRect();
+        const edgeZone = 40;
+        const minSpeed = 1;
+        const maxSpeed = 8;
+        const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+
+        if (clientY <= rect.top || clientY >= rect.bottom) {
+          autoScrollSpeed = 0;
+          return;
+        }
+
+        const distTop = clientY - rect.top;
+        const distBottom = rect.bottom - clientY;
+
+        if (distTop < edgeZone) {
+          autoScrollSpeed = -Math.round(minSpeed + (maxSpeed - minSpeed) * (1 - distTop / edgeZone));
+        } else if (distBottom < edgeZone) {
+          autoScrollSpeed = Math.round(minSpeed + (maxSpeed - minSpeed) * (1 - distBottom / edgeZone));
+        } else {
+          autoScrollSpeed = 0;
+        }
+
+        if (autoScrollSpeed !== 0 && !autoScrollRAF) {
+          autoScrollRAF = requestAnimationFrame(scrollLoop);
+        }
+      }
+
+      function stopAutoScroll() {
+        autoScrollSpeed = 0;
+        if (autoScrollRAF) {
+          cancelAnimationFrame(autoScrollRAF);
+          autoScrollRAF = null;
+        }
+      }
+
+      function scrollLoop() {
+        if (autoScrollSpeed === 0) {
+          autoScrollRAF = null;
+          return;
+        }
+        list.scrollTop += autoScrollSpeed;
+        autoScrollRAF = requestAnimationFrame(scrollLoop);
+      }
+
+      list.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        updateAutoScroll(e);
+      });
+
+      list.addEventListener('dragleave', function(e) {
+        if (!list.contains(e.relatedTarget)) {
+          stopAutoScroll();
+        }
+      });
+
+      items.forEach(item => {
+        item.addEventListener('dragstart', e => {
+          if (e.target.closest('.cover-play-btn')) {
+            e.preventDefault();
+            return;
+          }
+          draggedId = item.dataset.id;
+          if (!selectedIds.has(draggedId)) {
+            selectedIds.clear();
+            selectedIds.add(draggedId);
+            applySelectionUI();
+          }
+          document.querySelectorAll('.song-item').forEach(el => {
+            if (selectedIds.has(el.dataset.id)) {
+              el.classList.add('dragging');
+            }
+          });
+          e.dataTransfer.effectAllowed = 'move';
+        });
+
+        item.addEventListener('dragend', () => {
+          stopAutoScroll();
+          document.querySelectorAll('.song-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+          draggedId = null;
+        });
+
+        item.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = 'move';
+          updateAutoScroll(e);
+          item.classList.add('drag-over');
+        });
+
+        item.addEventListener('dragleave', () => {
+          item.classList.remove('drag-over');
+        });
+
+        item.addEventListener('drop', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          stopAutoScroll();
+          item.classList.remove('drag-over');
+
+          if (!draggedId || item.dataset.id === draggedId) return;
+
+          const draggedIds = [...selectedIds];
+          if (!draggedIds.includes(item.dataset.id)) {
+            const allItems = [...list.querySelectorAll('.song-item')];
+            const draggedEls = draggedIds.map(id => allItems.find(el => el.dataset.id === id)).filter(Boolean);
+
+            draggedEls.forEach(el => el.remove());
+
+            const remainingItems = [...list.querySelectorAll('.song-item')];
+            const targetIdx = remainingItems.indexOf(item);
+            const insertBeforeTarget = targetIdx >= 0 ? item : null;
+
+            if (insertBeforeTarget) {
+              draggedEls.forEach(el => list.insertBefore(el, insertBeforeTarget));
+            } else {
+              draggedEls.forEach(el => list.appendChild(el));
+            }
+
+            currentOrder = [...list.querySelectorAll('.song-item')].map(el => el.dataset.id);
+            reorderLocalSongs();
+            hasChanges = true;
+            updateSaveBtn();
+            updateIndexDisplay();
+            applySelectionUI();
+          }
+        });
+      });
+
+      if (isMobile) {
+        attachTouchDragEvents(list, items);
+      }
+    }
+
+    function attachTouchDragEvents(list, items) {
+      let touchDraggedId = null;
+      let ghost = null;
+      let lastTargetItem = null;
+      let scrollSpeed = 0;
+      let scrollTimer = null;
+
+      function createGhost(item) {
+        const el = document.createElement('div');
+        el.className = 'drag-ghost';
+        const title = item.querySelector('.song-title');
+        el.textContent = title ? title.textContent : '';
+        el.style.display = 'none';
+        document.body.appendChild(el);
+        return el;
+      }
+
+      function getTargetItem(touchY) {
+        const allItems = [...list.querySelectorAll('.song-item')];
+        for (const it of allItems) {
+          const rect = it.getBoundingClientRect();
+          const mid = rect.top + rect.height / 2;
+          if (touchY <= mid) return it;
+        }
+        return allItems[allItems.length - 1] || null;
+      }
+
+      function touchStartScroll(y) {
+        const rect = list.getBoundingClientRect();
+        const edgeZone = 60;
+        const minSpeed = 2;
+        const maxSpeed = 12;
+        const distTop = y - rect.top;
+        const distBottom = rect.bottom - y;
+
+        scrollSpeed = 0;
+        if (distTop < edgeZone && distTop > 0) {
+          scrollSpeed = -Math.round(minSpeed + (maxSpeed - minSpeed) * (1 - distTop / edgeZone));
+        } else if (distBottom < edgeZone && distBottom > 0) {
+          scrollSpeed = Math.round(minSpeed + (maxSpeed - minSpeed) * (1 - distBottom / edgeZone));
+        }
+
+        if (scrollSpeed !== 0 && !scrollTimer) {
+          scrollTimer = setInterval(() => {
+            list.scrollTop += scrollSpeed;
+          }, 16);
+        } else if (scrollSpeed === 0 && scrollTimer) {
+          clearInterval(scrollTimer);
+          scrollTimer = null;
+        }
+      }
+
+      function touchStopScroll() {
+        if (scrollTimer) {
+          clearInterval(scrollTimer);
+          scrollTimer = null;
+        }
+        scrollSpeed = 0;
+      }
+
+      items.forEach(item => {
+        const handle = item.querySelector('.drag-handle');
+        if (!handle) return;
+
+        handle.addEventListener('touchstart', function(e) {
+          touchDraggedId = item.dataset.id;
+          lastTargetItem = null;
+
+          if (!selectedIds.has(touchDraggedId)) {
+            selectedIds.clear();
+            selectedIds.add(touchDraggedId);
+            applySelectionUI();
+          }
+
+          ghost = createGhost(item);
+          document.querySelectorAll('.song-item').forEach(el => {
+            if (selectedIds.has(el.dataset.id)) {
+              el.classList.add('dragging');
+            }
+          });
+        }, { passive: false });
+
+        handle.addEventListener('touchmove', function(e) {
+          if (!touchDraggedId) return;
+
+          const y = e.touches[0].clientY;
+
+          if (ghost) {
+            ghost.style.display = 'block';
+            ghost.style.left = e.touches[0].pageX + 'px';
+            ghost.style.top = y + 'px';
+          }
+
+          touchStartScroll(y);
+
+          document.querySelectorAll('.song-item').forEach(el => el.classList.remove('drag-over'));
+          lastTargetItem = getTargetItem(y);
+          if (lastTargetItem && lastTargetItem.dataset.id !== touchDraggedId) {
+            lastTargetItem.classList.add('drag-over');
+          } else {
+            lastTargetItem = null;
+          }
+        }, { passive: false });
+
+        handle.addEventListener('touchend', function(e) {
+          if (!touchDraggedId) return;
+
+          touchStopScroll();
+          document.querySelectorAll('.song-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+
+          if (ghost) {
+            ghost.remove();
+            ghost = null;
+          }
+
+          if (lastTargetItem && lastTargetItem.dataset.id !== touchDraggedId) {
+            const draggedIds = [...selectedIds];
+            if (!draggedIds.includes(lastTargetItem.dataset.id)) {
+              const allItems = [...list.querySelectorAll('.song-item')];
+              const draggedEls = draggedIds.map(id => allItems.find(el => el.dataset.id === id)).filter(Boolean);
+
+              draggedEls.forEach(el => el.remove());
+
+              const remainingItems = [...list.querySelectorAll('.song-item')];
+              const targetIdx = remainingItems.indexOf(lastTargetItem);
+              const insertBeforeTarget = targetIdx >= 0 ? lastTargetItem : null;
+
+              if (insertBeforeTarget) {
+                draggedEls.forEach(el => list.insertBefore(el, insertBeforeTarget));
+              } else {
+                draggedEls.forEach(el => list.appendChild(el));
+              }
+
+              currentOrder = [...list.querySelectorAll('.song-item')].map(el => el.dataset.id);
+              reorderLocalSongs();
+              hasChanges = true;
+              updateSaveBtn();
+              updateIndexDisplay();
+              applySelectionUI();
+            }
+          }
+
+          touchDraggedId = null;
+          lastTargetItem = null;
+        });
+      });
+    }
+
+    function updateIndexDisplay() {
+      document.querySelectorAll('.song-item').forEach((item, i) => {
+        item.querySelector('.song-index').textContent = i + 1;
+      });
+    }
+
+    function reorderLocalSongs() {
+      const songs = allSongs[currentPeriod] || [];
+      const map = new Map(songs.map(s => [s.id, s]));
+      const ordered = currentOrder.map(id => map.get(id)).filter(Boolean);
+      allSongs[currentPeriod] = ordered;
+      updatePlayButtons();
+    }
+
+    function updateSaveBtn() {
+      const btn = document.getElementById('saveBtn');
+      if (hasChanges) {
+        btn.textContent = '💾 保存排序';
+        btn.disabled = false;
+        btn.classList.remove('saved');
+      } else {
+        btn.textContent = '✅ 已保存';
+        btn.disabled = true;
+        btn.classList.add('saved');
+      }
+    }
+
+    async function saveOrder() {
+      if (!hasChanges) return;
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ 保存中...';
+
+      try {
+        const res = await api('/api/manage/order/' + currentPeriod, {
+          method: 'POST',
+          body: JSON.stringify({ order: currentOrder })
+        });
+        if (res.success) {
+          hasChanges = false;
+          updateSaveBtn();
+          initAPlayer();
+          showToast('排序已保存成功', 'success');
+        } else {
+          showToast('保存失败: ' + (res.error || '未知错误'), 'error');
+          btn.disabled = false;
+          btn.textContent = '💾 保存排序';
+        }
+      } catch {
+        showToast('网络错误，保存失败', 'error');
+        btn.disabled = false;
+        btn.textContent = '💾 保存排序';
+      }
+    }
+
+    function doLogout() {
+      if (aplayer) {
+        aplayer.destroy();
+        aplayer = null;
+      }
+      currentPlayingId = null;
+      selectedIds.clear();
+      lastClickedIndex = -1;
+      localStorage.removeItem('sort_manager_token');
+      token = null;
+      allSongs = {};
+      document.getElementById('managerContainer').style.display = 'none';
+      document.getElementById('loginContainer').style.display = 'flex';
+      document.getElementById('passwordInput').value = '';
+      document.getElementById('loginError').style.display = 'none';
+    }
+
+    if (token) {
+      loadData().then(success => {
+        if (success) {
+          document.getElementById('loginContainer').style.display = 'none';
+          document.getElementById('managerContainer').style.display = 'flex';
+          document.getElementById('passwordInput').value = token;
+        } else {
+          localStorage.removeItem('sort_manager_token');
+          token = null;
+        }
+      });
+    }
+  </script>
+
+</body>
+
+</html>

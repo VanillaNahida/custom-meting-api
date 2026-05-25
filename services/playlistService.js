@@ -1,7 +1,9 @@
 const fs = require('fs').promises;
 const path = require('path');
+const crypto = require('crypto');
 const mm = require('music-metadata');
 const config = require('../config');
+const sortService = require('./sortService');
 
 class PlaylistService {
   constructor() {
@@ -139,12 +141,15 @@ class PlaylistService {
       const title = common.title || path.basename(filePath, path.extname(filePath));
       const artist = common.artist || '未知艺术家';
 
+      const id = crypto.createHash('md5').update(filePath).digest('hex');
+
       stats.titleFromMetadata = !!common.title;
       stats.artistFromMetadata = !!common.artist;
       stats.ffmpegMetadataExtracted = true;
 
       return {
         track: {
+          id: id,
           title: title,
           author: artist,
           url: url,
@@ -157,9 +162,11 @@ class PlaylistService {
       console.error(`解析文件失败 ${filePath}:`, error.message);
       const relativePath = path.relative(config.playlist.baseDir, filePath);
       const url = this.buildUrl(relativePath);
+      const id = crypto.createHash('md5').update(filePath).digest('hex');
 
       return {
         track: {
+          id: id,
           title: path.basename(filePath, path.extname(filePath)),
           author: '未知艺术家',
           url: url,
@@ -214,6 +221,8 @@ class PlaylistService {
 
     playlist.sort((a, b) => a.title.localeCompare(b.title));
 
+    const orderedPlaylist = await sortService.getOrderedPlaylist(playlist, period);
+
     // 如果是刷新模式，输出详细的元数据统计
     if (refreshMetadata) {
       this.logMetadataStats(allStats);
@@ -221,14 +230,14 @@ class PlaylistService {
 
     if (config.cache.enabled) {
       this.cache.set(cacheKey, {
-        data: playlist,
+        data: orderedPlaylist,
         timestamp: Date.now()
       });
     }
 
     this.lastScanTime.set(period, new Date());
 
-    return playlist;
+    return orderedPlaylist;
   }
 
   logMetadataStats(stats) {
@@ -278,6 +287,46 @@ class PlaylistService {
 
   clearCache() {
     this.cache.clear();
+  }
+
+  async scanAllPlaylists() {
+    const periods = ['daytime', 'night'];
+    const allSongs = {};
+
+    for (const period of periods) {
+      const folderName = period === 'daytime'
+        ? config.playlist.daytime.folder
+        : config.playlist.night.folder;
+
+      const folderPath = path.resolve(config.playlist.baseDir, folderName);
+
+      try {
+        await fs.access(folderPath);
+      } catch {
+        allSongs[period] = [];
+        continue;
+      }
+
+      const files = await fs.readdir(folderPath);
+      const audioFiles = files.filter(file => {
+        const ext = path.extname(file).toLowerCase();
+        return config.supportedFormats.includes(ext);
+      });
+
+      const songs = [];
+      for (const file of audioFiles) {
+        const filePath = path.join(folderPath, file);
+        const result = await this.parseAudioFile(filePath, folderPath, false);
+        songs.push(result.track);
+      }
+
+      songs.sort((a, b) => a.title.localeCompare(b.title));
+
+      const orderedSongs = await sortService.getOrderedPlaylist(songs, period);
+      allSongs[period] = orderedSongs;
+    }
+
+    return allSongs;
   }
 }
 

@@ -38,6 +38,11 @@ const config = {
 
   testPage: {
     enabled: process.env.TEST_PAGE_ENABLED !== 'false'
+  },
+
+  sortManager: {
+    enabled: process.env.SORT_MANAGER_ENABLED === 'true',
+    password: process.env.SORT_MANAGER_PASSWORD || ''
   }
 };
 

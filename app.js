@@ -1,10 +1,68 @@
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
+const os = require('os');
 const cors = require('cors');
 const config = require('./config');
 const playlistService = require('./services/playlistService');
 
 const app = express();
+
+// 彩色日志输出配置
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  dim: '\x1b[2m',
+  underscore: '\x1b[4m',
+  blink: '\x1b[5m',
+  reverse: '\x1b[7m',
+  hidden: '\x1b[8m',
+  fg: {
+    black: '\x1b[30m',
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    magenta: '\x1b[35m',
+    cyan: '\x1b[36m',
+    white: '\x1b[37m',
+  },
+  bg: {
+    black: '\x1b[40m',
+    red: '\x1b[41m',
+    green: '\x1b[42m',
+    yellow: '\x1b[43m',
+    blue: '\x1b[44m',
+    magenta: '\x1b[45m',
+    cyan: '\x1b[46m',
+    white: '\x1b[47m',
+  }
+};
+
+// 日志工具函数
+const logger = {
+  info: (message) => {
+    console.log(`${colors.fg.cyan}[INFO]${colors.reset} ${message}`);
+  },
+  error: (message) => {
+    console.error(`${colors.fg.red}[ERROR]${colors.reset} ${message}`);
+  },
+  success: (message) => {
+    console.log(`${colors.fg.green}[SUCCESS]${colors.reset} ${message}`);
+  },
+  warning: (message) => {
+    console.log(`${colors.fg.yellow}[WARNING]${colors.reset} ${message}`);
+  },
+  debug: (message) => {
+    console.log(`${colors.fg.magenta}[DEBUG]${colors.reset} ${message}`);
+  },
+  server: (message) => {
+    console.log(`${colors.fg.blue}${colors.bright}[SERVER]${colors.reset} ${message}`);
+  },
+  request: (message) => {
+    console.log(`${colors.fg.green}${colors.bright}[REQUEST]${colors.reset} ${message}`);
+  }
+};
 
 app.use(express.json());
 
@@ -75,7 +133,7 @@ const requestLogger = (req, res, next) => {
   const method = req.method;
   const url = req.originalUrl;
 
-  console.log(`[${requestTime}] [INFO] ${clientIp} - ${method} ${url} - 开始处理`);
+  logger.request(`${colors.fg.white}[${requestTime}] ${colors.fg.yellow}${clientIp} ${colors.reset}- ${colors.fg.green}${method} ${colors.fg.blue}${url} ${colors.reset}- 开始处理`);
 
   const originalJson = res.json;
   const originalSend = res.send;
@@ -91,14 +149,14 @@ const requestLogger = (req, res, next) => {
       try {
         const data = typeof responseData === 'string' ? JSON.parse(responseData) : responseData;
         if (data.success !== undefined) {
-          responseResult = `${statusCode} (${data.success ? 'success' : 'failed'})`;
+          responseResult = `${statusCode} (${data.success ? `${colors.fg.green}success${colors.reset}` : `${colors.fg.red}failed${colors.reset}`})`;
         }
       } catch (e) {
         responseResult = statusCode;
       }
     }
 
-    console.log(`[${new Date().toISOString()}] [INFO] ${clientIp} - ${method} ${url} - 完成 - ${responseResult} - ${processingTime}ms`);
+    logger.request(`${colors.fg.white}[${new Date().toISOString()}] ${colors.fg.yellow}${clientIp} ${colors.reset}- ${colors.fg.green}${method} ${colors.fg.blue}${url} ${colors.reset}- 完成 - ${responseResult} - ${colors.fg.cyan}${processingTime}ms${colors.reset}`);
   };
 
   res.json = function(data) {
@@ -125,6 +183,14 @@ app.use(requestLogger);
 // 提供测试网页访问
 if (config.testPage.enabled) {
   app.use('/test', express.static(path.join(__dirname, 'test')));
+}
+
+// 排序管理页面
+if (config.sortManager.enabled) {
+  if (!config.sortManager.password) {
+    config.sortManager.password = crypto.randomBytes(16).toString('hex');
+  }
+  app.use('/', require('./routes/sortManager'));
 }
 
 // 提供静态资源访问（包含默认封面）
@@ -166,7 +232,7 @@ app.get('/api/playlist', async (req, res) => {
     
     res.json(playlist);
   } catch (error) {
-    console.error('获取歌单失败:', error);
+    logger.error(`获取歌单失败: ${error.message}`);
     res.status(500).json([]);
   }
 });
@@ -200,7 +266,7 @@ app.post('/api/refresh', async (req, res) => {
     
     res.json(playlist);
   } catch (error) {
-    console.error('刷新歌单失败:', error);
+    logger.error(`刷新歌单失败: ${error.message}`);
     res.status(500).json([]);
   }
 });
@@ -214,7 +280,7 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('服务器错误:', err);
+  logger.error(`服务器错误: ${err.message}`);
   res.status(500).json({
     success: false,
     error: 'Internal Server Error',
@@ -224,6 +290,19 @@ app.use((err, req, res, next) => {
 
 const PORT = config.port;
 const HOST = config.host;
+
+function getLocalIPs() {
+  const interfaces = os.networkInterfaces();
+  const ips = [];
+  for (const [name, addrs] of Object.entries(interfaces)) {
+    for (const addr of addrs) {
+      if (addr.family === 'IPv4' && !addr.internal) {
+        ips.push({ name, address: addr.address });
+      }
+    }
+  }
+  return ips;
+}
 
 let server;
 
@@ -235,23 +314,39 @@ function startServer() {
         return;
       }
       
-      console.log(`====================================`);
-      console.log(`  Custom Meting API 服务已启动`);
-      console.log(`====================================`);
-      console.log(`  地址: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
-      if (config.testPage.enabled) {
-        console.log(`  测试页面: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/test/`);
+      logger.server(`${colors.bright}====================================${colors.reset}`);
+      logger.success(`  ${colors.bright}Custom Meting API 服务已启动${colors.reset}`);
+      logger.server(`${colors.bright}====================================${colors.reset}`);
+      logger.info(`  监听地址: ${colors.fg.green}http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}${colors.reset}`);
+
+      const localIPs = getLocalIPs();
+      if (localIPs.length > 0) {
+        logger.info(`  本机 IP:`);
+        localIPs.forEach(ip => {
+          logger.info(`    ${colors.fg.cyan}${ip.name}${colors.reset}: ${colors.fg.green}http://${ip.address}:${PORT}${colors.reset}`);
+        });
       }
-      console.log(`  日间时段: ${config.playlist.daytime.startHour}:00 - ${config.playlist.daytime.endHour}:00`);
-      console.log(`  夜间时段: ${config.playlist.night.startHour}:00 - ${config.playlist.night.endHour}:00`);
-      console.log(`====================================`);
-      console.log(`  API端点:`);
-      console.log(`    - GET  /api/playlist  获取当前时段的歌单`);
-      console.log(`    - GET  /api/status    获取服务状态`);
-      console.log(`    - POST /api/refresh    刷新歌单缓存`);
-      console.log(`====================================`);
-      console.log(`  按 Ctrl+C 即可停止服务`);
-      console.log(`====================================`);
+      if (config.externalUrl) {
+        logger.info(`  外部访问: ${colors.fg.green}${config.externalUrl}${colors.reset}`);
+      }
+      if (config.testPage.enabled) {
+        logger.info(`  测试页面: ${colors.fg.green}http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/test/${colors.reset}`);
+      }
+      if (config.sortManager.enabled) {
+        logger.info(`  排序管理: ${colors.fg.green}http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/manage/${colors.reset}`);
+        logger.warning(`  管理密码: ${colors.fg.yellow}${colors.bright}${config.sortManager.password}${colors.reset}`);
+        logger.warning(`  请妥善保管此密码！使用 Authorization: Bearer ${config.sortManager.password} 进行鉴权`);
+      }
+      logger.info(`  日间时段: ${colors.fg.yellow}${config.playlist.daytime.startHour}:00 - ${config.playlist.daytime.endHour}:00${colors.reset}`);
+      logger.info(`  夜间时段: ${colors.fg.blue}${config.playlist.night.startHour}:00 - ${config.playlist.night.endHour}:00${colors.reset}`);
+      logger.server(`${colors.bright}====================================${colors.reset}`);
+      logger.info(`  API端点:`);
+      logger.info(`    - ${colors.fg.green}GET${colors.reset}  ${colors.fg.cyan}/api/playlist${colors.reset}  获取当前时段的歌单`);
+      logger.info(`    - ${colors.fg.green}GET${colors.reset}  ${colors.fg.cyan}/api/status${colors.reset}    获取服务状态`);
+      logger.info(`    - ${colors.fg.yellow}POST${colors.reset} ${colors.fg.cyan}/api/refresh${colors.reset}    刷新歌单缓存`);
+      logger.server(`${colors.bright}====================================${colors.reset}`);
+      logger.warning(`  按 ${colors.fg.red}Ctrl+C${colors.reset} 即可停止服务`);
+      logger.server(`${colors.bright}====================================${colors.reset}`);
       
       resolve();
     });
@@ -260,26 +355,26 @@ function startServer() {
 
 // 优雅关闭函数
 function gracefulShutdown(signal) {
-  console.log(`\n${signal} 收到关闭信号，正在停止服务...`);
+  logger.warning(`\n${colors.fg.yellow}${signal}${colors.reset} 收到关闭信号，正在停止服务...`);
   
   if (server) {
     server.close((err) => {
       if (err) {
-        console.error('关闭服务器时出错:', err);
+        logger.error(`关闭服务器时出错: ${err.message}`);
         process.exit(1);
       }
       
-      console.log('HTTP 服务器已正常关闭');
+      logger.success('HTTP 服务器已正常关闭');
       process.exit(0);
     });
   } else {
-    console.log('服务器未启动，直接退出');
+    logger.info('服务器未启动，直接退出');
     process.exit(0);
   }
 
   // 如果10秒后还没关闭，强制退出
   setTimeout(() => {
-    console.error('无法正常关闭，强制退出');
+    logger.error('无法正常关闭，强制退出');
     process.exit(1);
   }, 10000);
 }
@@ -290,18 +385,18 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // 处理未捕获的异常
 process.on('uncaughtException', (err) => {
-  console.error('未捕获的异常:', err);
+  logger.error(`未捕获的异常: ${err.message}`);
   gracefulShutdown('uncaughtException');
 });
 
 // 处理未拒绝的Promise
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('未处理的Promise拒绝:', reason);
+  logger.error(`未处理的Promise拒绝: ${reason}`);
 });
 
 // 启动服务器
 startServer().catch((err) => {
-  console.error('启动服务器失败:', err);
+  logger.error(`启动服务器失败: ${err.message}`);
   process.exit(1);
 });
 
