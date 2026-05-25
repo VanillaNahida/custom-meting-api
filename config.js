@@ -43,6 +43,11 @@ const config = {
   sortManager: {
     enabled: process.env.SORT_MANAGER_ENABLED === 'true',
     password: process.env.SORT_MANAGER_PASSWORD || ''
+  },
+
+  ffmpeg: {
+    ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
+    ffprobePath: process.env.FFPROBE_PATH || 'ffprobe'
   }
 };
 
