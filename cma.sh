@@ -248,6 +248,39 @@ clean_log() {
     log_success "日志已清理"
 }
 
+# 修复权限
+fix_permissions() {
+    log_info "正在修复权限..."
+    
+    PLAYLIST_DIR="$SCRIPT_DIR/playlist"
+    DATA_DIR="$SCRIPT_DIR/data"
+    ASSETS_DIR="$SCRIPT_DIR/assets"
+    
+    if [ -d "$PLAYLIST_DIR" ]; then
+        log_info "设置 playlist/ 目录权限..."
+        find "$PLAYLIST_DIR" -type d -exec chmod 755 {} \;
+        find "$PLAYLIST_DIR" -type f -exec chmod 644 {} \;
+        log_success "playlist/ 权限已修复"
+    fi
+    
+    if [ -d "$DATA_DIR" ]; then
+        log_info "设置 data/ 目录权限..."
+        find "$DATA_DIR" -type d -exec chmod 755 {} \;
+        find "$DATA_DIR" -type f -exec chmod 644 {} \;
+        log_success "data/ 权限已修复"
+    fi
+    
+    if [ -d "$ASSETS_DIR" ]; then
+        log_info "设置 assets/ 目录权限..."
+        find "$ASSETS_DIR" -type d -exec chmod 755 {} \;
+        find "$ASSETS_DIR" -type f -exec chmod 644 {} \;
+        log_success "assets/ 权限已修复"
+    fi
+    
+    log_success "权限修复完成！"
+    log_info "提示：如果仍有权限问题，可能需要以 root 身份运行：sudo $0 chmod"
+}
+
 # 显示帮助
 show_help() {
     echo ""
@@ -265,6 +298,7 @@ show_help() {
     echo "  log [选项]     查看日志"
     echo "  monit          进入监控面板"
     echo "  clean          清理日志"
+    echo "  chmod          修复目录和文件权限"
     echo "  help           显示帮助信息"
     echo ""
     echo "日志选项:"
@@ -308,6 +342,9 @@ main() {
             ;;
         clean)
             clean_log
+            ;;
+        chmod|perm|permission)
+            fix_permissions
             ;;
         help|--help|-h)
             show_help
