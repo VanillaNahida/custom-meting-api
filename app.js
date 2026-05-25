@@ -237,6 +237,26 @@ app.get('/api/playlist', async (req, res) => {
   }
 });
 
+app.get('/meting/api', async (req, res) => {
+  try {
+    const { server, type, id } = req.query;
+    const validPeriods = ['daytime', 'night'];
+    const period = validPeriods.includes(id) ? id : null;
+
+    const playlist = await playlistService.scanPlaylist(false, period);
+
+    res.set({
+      'X-Period': period || playlistService.getCurrentPeriod(),
+      'X-Current-Time': new Date().toISOString()
+    });
+
+    res.json(playlist);
+  } catch (error) {
+    logger.error(`获取歌单失败: ${error.message}`);
+    res.status(500).json([]);
+  }
+});
+
 app.get('/api/status', (req, res) => {
   const period = playlistService.getCurrentPeriod();
 

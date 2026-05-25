@@ -49,13 +49,16 @@ class PlaylistService {
     return 'night';
   }
 
-  getPlaylistFolder() {
-    const period = this.getCurrentPeriod();
+  getPlaylistFolderForPeriod(period) {
     const folderName = period === 'daytime'
       ? config.playlist.daytime.folder
       : config.playlist.night.folder;
 
     return path.resolve(config.playlist.baseDir, folderName);
+  }
+
+  getPlaylistFolder() {
+    return this.getPlaylistFolderForPeriod(this.getCurrentPeriod());
   }
 
   async getLrcFile(audioPath) {
@@ -345,8 +348,8 @@ class PlaylistService {
     }
   }
 
-  async scanPlaylist(refreshMetadata = false) {
-    const period = this.getCurrentPeriod();
+  async scanPlaylist(refreshMetadata = false, periodOverride = null) {
+    const period = periodOverride || this.getCurrentPeriod();
     const cacheKey = period;
 
     if (!refreshMetadata && config.cache.enabled && this.cache.has(cacheKey)) {
@@ -359,7 +362,7 @@ class PlaylistService {
       }
     }
 
-    const folderPath = this.getPlaylistFolder();
+    const folderPath = this.getPlaylistFolderForPeriod(period);
 
     try {
       await fs.access(folderPath);
@@ -464,11 +467,7 @@ class PlaylistService {
     const allSongs = {};
 
     for (const period of periods) {
-      const folderName = period === 'daytime'
-        ? config.playlist.daytime.folder
-        : config.playlist.night.folder;
-
-      const folderPath = path.resolve(config.playlist.baseDir, folderName);
+      const folderPath = this.getPlaylistFolderForPeriod(period);
 
       try {
         await fs.access(folderPath);
@@ -500,10 +499,7 @@ class PlaylistService {
   }
 
   async getSongIds(period) {
-    const folderName = period === 'daytime'
-      ? config.playlist.daytime.folder
-      : config.playlist.night.folder;
-    const folderPath = path.resolve(config.playlist.baseDir, folderName);
+    const folderPath = this.getPlaylistFolderForPeriod(period);
 
     try {
       const files = await fs.readdir(folderPath);
