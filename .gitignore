@@ -29,3 +29,5 @@ build/
 logs/
 *.md
 data/
+package-lock.json
+yarn.lock
