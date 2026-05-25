@@ -12,8 +12,19 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-playlists/
-playlist/
+# playlist 中的媒体文件不纳入版本控制
+playlist/**/*.mp3
+playlist/**/*.flac
+playlist/**/*.ogg
+playlist/**/*.wav
+playlist/**/*.m4a
+playlist/**/*.aac
+playlist/**/*.opus
+playlist/**/*.lrc
+playlist/**/*.jpg
+playlist/**/*.jpeg
+playlist/**/*.png
+playlist/**/*.webp
 
 dist/
 build/
@@ -27,7 +38,6 @@ build/
 *.swo
 *~
 logs/
-*.md
 data/
 package-lock.json
 yarn.lock
