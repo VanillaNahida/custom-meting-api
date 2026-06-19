@@ -9,7 +9,7 @@ if (!fs.existsSync(logsDir)) {
 module.exports = {
   apps: [{
     name: 'custom-meting-api',
-    script: './app.js',
+    script: './src/app.js',
     exec_mode: 'fork',  // 明确使用fork模式
     instances: 1,  // 只运行一个实例
     autorestart: true,

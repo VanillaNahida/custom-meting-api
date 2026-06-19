@@ -1,7 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-const ORDER_FILE = path.resolve(__dirname, '../data/playlist-order.json');
+const ORDER_FILE = path.resolve(__dirname, '../../data/playlist-order.json');
 
 async function ensureOrderFile() {
   try {

@@ -20,7 +20,7 @@ function authMiddleware(req, res, next) {
   next();
 }
 
-router.use('/manage', express.static(path.join(__dirname, '..', 'sort-manager')));
+router.use('/manage', express.static(path.join(__dirname, '..', '..', 'assets', 'sort-manager')));
 
 router.use('/api/manage', authMiddleware);
 

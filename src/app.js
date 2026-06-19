@@ -182,7 +182,7 @@ app.use(requestLogger);
 
 // 提供测试网页访问
 if (config.testPage.enabled) {
-  app.use('/test', express.static(path.join(__dirname, 'test')));
+  app.use('/test', express.static(path.join(__dirname, '..', 'assets', 'test')));
 }
 
 // 排序管理页面
@@ -194,7 +194,7 @@ if (config.sortManager.enabled) {
 }
 
 // 提供静态资源访问（包含默认封面）
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
+app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
 
 // 提供歌单文件访问
 app.use('/', express.static(config.playlist.baseDir, {

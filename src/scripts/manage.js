@@ -3,7 +3,7 @@ const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 
 const appName = 'custom-meting-api';
-const ecosystemFile = path.join(__dirname, 'ecosystem.config.js');
+const ecosystemFile = path.join(__dirname, '..', '..', 'ecosystem.config.js');
 
 function runCommand(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {
