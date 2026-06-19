@@ -369,6 +369,26 @@
             
         }
         
+        // 图片懒加载观察器
+        let lazyObserver = null;
+        function initLazyObserver() {
+            if (lazyObserver) lazyObserver.disconnect();
+            lazyObserver = new IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        const src = img.getAttribute('data-src');
+                        if (src) {
+                            img.src = src;
+                            img.removeAttribute('data-src');
+                        }
+                        lazyObserver.unobserve(img);
+                    }
+                });
+            }, { rootMargin: '200px' });
+            return lazyObserver;
+        }
+
         // 渲染歌单
         function renderPlaylist(songs) {
             const playlistEl = document.getElementById('playlist');
@@ -378,15 +398,21 @@
                 return;
             }
             
+            const obs = initLazyObserver();
             playlistEl.innerHTML = songs.map((song, index) => `
                 <div class="song-item" onclick="playSong(${index})">
-                    <img src="${song.pic}" alt="" class="song-cover">
+                    <img data-src="${song.pic}" alt="" class="song-cover">
                     <div class="song-name">${escapeHtml(song.title)}</div>
                     <div class="song-artist">${escapeHtml(song.author)}</div>
                     <div class="song-url">${escapeHtml(song.url)}</div>
                     ${song.lrc ? '<div style="color: #00b7ff; font-size: 0.85em;">有歌词</div>' : ''}
                 </div>
             `).join('');
+
+            // 注册所有封面图片到懒加载观察器
+            playlistEl.querySelectorAll('.song-cover').forEach(function (img) {
+                obs.observe(img);
+            });
         }
         
         // 播放歌曲

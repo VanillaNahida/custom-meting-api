@@ -528,6 +528,24 @@
     let selectedIds = new Set();
     let lastClickedIndex = -1;
 
+    let lazyCoverObserver = null;
+    function initLazyObserver() {
+      if (lazyCoverObserver) lazyCoverObserver.disconnect();
+      lazyCoverObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            var img = entry.target;
+            var src = img.getAttribute('data-src');
+            if (src) {
+              img.src = src;
+              img.removeAttribute('data-src');
+            }
+            lazyCoverObserver.unobserve(img);
+          }
+        });
+      }, { rootMargin: '200px' });
+    }
+
     function api(path, options = {}) {
       return fetch(path, {
         ...options,
@@ -637,7 +655,7 @@
       <div class="drag-handle"><span></span><span></span><span></span></div>
       <div class="song-index">${i + 1}</div>
       <div class="song-cover-wrap">
-        <img class="song-cover" src="${escapeAttr(s.pic)}" alt="" loading="lazy" onerror="this.style.display='none'">
+        <img class="song-cover" data-src="${escapeAttr(s.pic)}" alt="" onerror="this.style.display='none'">
         <button class="cover-play-btn" data-song-id="${escapeAttr(s.id)}">
           <img src="play.svg" class="play-icon" alt="播放">
         </button>
@@ -648,6 +666,12 @@
       </div>
     </div>
   `).join('');
+
+      // 注册图片到懒加载观察器
+      initLazyObserver();
+      list.querySelectorAll('.song-cover[data-src]').forEach(function (img) {
+        lazyCoverObserver.observe(img);
+      });
 
       attachDragEvents();
       applySelectionUI();
