@@ -193,6 +193,11 @@ if (config.sortManager.enabled) {
   app.use('/', require('./routes/sortManager'));
 }
 
+// 提供 favicon
+app.get('/favicon.ico', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'assets', 'favicon.ico'));
+});
+
 // 提供静态资源访问（包含默认封面）
 app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
 
