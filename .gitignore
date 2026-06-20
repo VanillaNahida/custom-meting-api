@@ -1,5 +1,9 @@
 node_modules/
 
+# 配置文件
+config.yaml
+
+# 环境变量文件（旧版，不再使用）
 .env
 .env.local
 .env.*.local
